@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   DEFAULTS,
   GROUPS,
+  SIMILAR_CHARACTERS,
   generate,
   readSettings,
   validate,
@@ -317,6 +318,25 @@ export default function Home() {
           />
           選択した文字種をそれぞれ1文字以上含める
         </label>
+        <div className="similar-excluded">
+          <label className="check-line">
+            <input
+              type="checkbox"
+              checked={settings.excludeSimilar}
+              disabled={!ready}
+              onChange={(e) =>
+                update({ excludeSimilar: e.target.checked }, true)
+              }
+            />
+            視認しにくい文字を除外する
+          </label>
+          <p className="hint">
+            オンにすると、次の文字を生成候補から除外します。
+          </p>
+          <p className="similar-characters">
+            <code>{SIMILAR_CHARACTERS}</code>
+          </p>
+        </div>
         <div className="field excluded">
           <label htmlFor="excluded">
             使用禁止文字 <span className="optional">任意</span>

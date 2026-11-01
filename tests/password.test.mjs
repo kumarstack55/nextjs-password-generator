@@ -12,7 +12,14 @@ const compiled = ts.transpileModule(source, {
     module: ts.ModuleKind.ES2020,
   },
 }).outputText;
-const { DEFAULTS, GROUPS, generate, validate, readSettings } = await import(
+const {
+  DEFAULTS,
+  GROUPS,
+  SIMILAR_CHARACTERS,
+  generate,
+  validate,
+  readSettings,
+} = await import(
   "data:text/javascript;base64," + Buffer.from(compiled).toString("base64")
 );
 test("defaults generate ten 64-character passwords with letters and digits only", () => {
@@ -35,6 +42,51 @@ test("excluded characters never appear, including duplicated exclusions", () => 
     assert.equal(p.length, 128);
     assert.ok(![...p].some((c) => s.excluded.includes(c)));
   }
+});
+test("similar characters are excluded only when enabled", () => {
+  assert.equal(DEFAULTS.excludeSimilar, false);
+  assert.equal(SIMILAR_CHARACTERS, "0OQDoIl|1ijS5Z2B8q9G6");
+  assert.equal(new Set(SIMILAR_CHARACTERS).size, SIMILAR_CHARACTERS.length);
+
+  const enabled = {
+    ...DEFAULTS,
+    excludeSimilar: true,
+    groups: Object.keys(GROUPS),
+  };
+  for (const password of generate(enabled))
+    assert.ok(
+      [...password].every(
+        (character) => !SIMILAR_CHARACTERS.includes(character),
+      ),
+    );
+
+  const remainingLowercase = {
+    ...DEFAULTS,
+    excludeSimilar: true,
+    groups: ["lower"],
+    excluded: GROUPS.lower.chars.replace(/[sz]/g, ""),
+  };
+  for (const password of generate(remainingLowercase))
+    assert.match(password, /^[sz]+$/);
+
+  const manualExclusion = {
+    ...DEFAULTS,
+    excludeSimilar: true,
+    groups: ["digits"],
+    excluded: "3",
+  };
+  for (const password of generate(manualExclusion))
+    assert.match(password, /^[47]+$/);
+});
+test("similar-character exclusions participate in candidate validation", () => {
+  const settings = {
+    ...DEFAULTS,
+    excludeSimilar: true,
+    groups: ["upper"],
+    excluded: GROUPS.upper.chars.replace("O", ""),
+  };
+  assert.ok(validate(settings).excluded);
+  assert.throws(() => generate(settings));
 });
 test("impossible and malformed settings are rejected", () => {
   for (const patch of [
@@ -106,8 +158,14 @@ test("persisted settings are whitelisted and malformed data rejected", () => {
     { ...DEFAULTS, groups: ["toString"] },
     { ...DEFAULTS, groups: ["upper", "upper"] },
     { ...DEFAULTS, length: 64 },
+    { ...DEFAULTS, excludeSimilar: "true" },
   ])
     assert.equal(readSettings(value), null);
+});
+test("saved settings without the similar-character option remain compatible", () => {
+  const legacy = { ...DEFAULTS };
+  delete legacy.excludeSimilar;
+  assert.deepEqual(readSettings(legacy), DEFAULTS);
 });
 test("secure randomness failure never falls back to another source", () => {
   const original = crypto.getRandomValues;
