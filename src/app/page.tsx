@@ -32,7 +32,7 @@ export default function Home() {
   );
   const errors = validate(settings),
     invalid = Object.keys(errors).length > 0;
-  const editingEmpty = !settings.length && !blurred.length;
+  const editingEmpty = !settings.passwordLength && !blurred.length;
   function regenerate(s: Settings) {
     clearTimeout(generationTimer.current);
     version.current++;
@@ -196,11 +196,11 @@ export default function Home() {
                 min="1"
                 max="128"
                 step="1"
-                value={sliderDraft ?? settings.length}
+                value={sliderDraft ?? settings.passwordLength}
                 disabled={!ready}
                 onFocus={() => setBlurred((b) => ({ ...b, length: false }))}
                 onBlur={() => setBlurred((b) => ({ ...b, length: true }))}
-                onChange={(e) => update({ length: e.target.value })}
+                onChange={(e) => update({ passwordLength: e.target.value })}
                 aria-invalid={visibleError("length")}
                 aria-describedby={
                   visibleError("length") ? "length-error" : undefined
@@ -215,7 +215,7 @@ export default function Home() {
               step="1"
               value={Math.min(
                 128,
-                Math.max(1, +(sliderDraft ?? settings.length) || 1),
+                Math.max(1, +(sliderDraft ?? settings.passwordLength) || 1),
               )}
               disabled={!ready}
               aria-label="パスワードの文字数（スライダー）"
