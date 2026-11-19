@@ -20,12 +20,15 @@ export const GROUPS = {
 };
 export const SIMILAR_CHARACTERS = "0OQDoIl|1ijS5Z2B8q9G6";
 export type Group = keyof typeof GROUPS;
+export type SymbolMode = "default" | "custom";
 export type Settings = {
   passwordLength: string;
   groups: Group[];
   required: boolean;
   excludeSimilar: boolean;
   excluded: string;
+  symbolMode: SymbolMode;
+  customSymbols: string;
 };
 export const DEFAULTS: Settings = {
   passwordLength: "64",
@@ -33,10 +36,24 @@ export const DEFAULTS: Settings = {
   required: true,
   excludeSimilar: false,
   excluded: "",
+  symbolMode: "default",
+  customSymbols: "",
 };
-export type Errors = Partial<Record<"length" | "groups" | "excluded", string>>;
+export type Errors = Partial<
+  Record<"length" | "groups" | "excluded" | "symbols", string>
+>;
 function availableCharacters(group: Group, settings: Settings): string[] {
-  return [...GROUPS[group].chars].filter(
+  const source =
+    group === "symbols" && settings.symbolMode === "custom"
+      ? [
+          ...new Set(
+            [...settings.customSymbols].filter((c) =>
+              GROUPS.symbols.chars.includes(c),
+            ),
+          ),
+        ]
+      : [...GROUPS[group].chars];
+  return source.filter(
     (c) =>
       !settings.excluded.includes(c) &&
       !(settings.excludeSimilar && SIMILAR_CHARACTERS.includes(c)),
@@ -53,16 +70,24 @@ export function validate(s: Settings): Errors {
   if (!s.groups.length) e.groups = "文字種を1つ以上選択してください。";
   else {
     const available = s.groups.map((g) => availableCharacters(g, s));
-    if (available.every((g) => !g.length))
+    const unavailable = s.groups.filter((_, i) => !available[i].length);
+    const customSymbolsUnavailable =
+      s.symbolMode === "custom" && unavailable.includes("symbols");
+    if (customSymbolsUnavailable)
+      e.symbols =
+        "指定した記号セットに使用できる記号がありません。入力内容や除外設定を見直してください。";
+    if (unavailable.length === s.groups.length && !customSymbolsUnavailable)
       e.excluded =
         "使用できる文字がありません。文字種や除外設定を見直してください。";
-    else if (s.required && available.some((g) => !g.length))
-      e.excluded =
-        s.groups
-          .filter((_, i) => !available[i].length)
-          .map((g) => GROUPS[g].label)
-          .join("・") +
-        "がすべて除外されています。除外設定を見直すか、各文字種を含める設定をオフにしてください。";
+    else if (s.required) {
+      const requiredUnavailable = unavailable.filter(
+        (g) => !(customSymbolsUnavailable && g === "symbols"),
+      );
+      if (requiredUnavailable.length)
+        e.excluded =
+          requiredUnavailable.map((g) => GROUPS[g].label).join("・") +
+          "がすべて除外されています。除外設定を見直すか、各文字種を含める設定をオフにしてください。";
+    }
     if (!e.length && s.required && +s.passwordLength < s.groups.length)
       e.length = `選択した${s.groups.length}種類を含めるには、${s.groups.length}文字以上にしてください。`;
   }
@@ -138,6 +163,10 @@ export function readSettings(value: unknown): Settings | null {
     typeof s.excluded !== "string" ||
     typeof s.required !== "boolean" ||
     (s.excludeSimilar !== undefined && typeof s.excludeSimilar !== "boolean") ||
+    (s.symbolMode !== undefined &&
+      s.symbolMode !== "default" &&
+      s.symbolMode !== "custom") ||
+    (s.customSymbols !== undefined && typeof s.customSymbols !== "string") ||
     !Array.isArray(s.groups) ||
     !s.groups.every((g) => Object.hasOwn(GROUPS, g)) ||
     new Set(s.groups).size !== s.groups.length
@@ -149,5 +178,7 @@ export function readSettings(value: unknown): Settings | null {
     required: s.required,
     excludeSimilar: s.excludeSimilar ?? false,
     groups: [...s.groups],
+    symbolMode: s.symbolMode ?? "default",
+    customSymbols: s.customSymbols ?? "",
   };
 }

@@ -103,8 +103,9 @@ export default function Home() {
     clearTimeout(generationTimer.current);
     delay.current = immediate ? 0 : 200;
     version.current++;
-    // Exclusion edits retain the existing inputs until validation/generation finishes.
-    if (patch.excluded === undefined) setPasswords([]);
+    // Exclusion and custom-symbol edits retain results until validation finishes.
+    if (patch.excluded === undefined && patch.customSymbols === undefined)
+      setPasswords([]);
     setMessages({});
     setFailure("");
     setSettled(false);
@@ -118,7 +119,7 @@ export default function Home() {
     sliderActive.current = false;
     setSliderDraft(null);
     delay.current = 0;
-    const next = { ...settings, length };
+    const next = { ...settings, passwordLength: length };
     // Keep valid results mounted until their replacements are ready.
     // Invalid committed conditions still clear results as before.
     if (Object.keys(validate(next)).length) {
@@ -167,7 +168,7 @@ export default function Home() {
     return (
       !!errors[key] &&
       (settled || blurred[key]) &&
-      (key !== "length" || settings[key] !== "" || blurred[key])
+      (key !== "length" || settings.passwordLength !== "" || blurred[key])
     );
   }
   function error(key: keyof Errors) {
@@ -306,8 +307,58 @@ export default function Home() {
         </fieldset>
         <details>
           <summary>記号選択時に使う文字を確認</summary>
-          <code>{GROUPS.symbols.chars}</code>
-          <p>空白は含みません。使用禁止文字に入力した記号は除外します。</p>
+          <fieldset className="symbol-settings">
+            <legend>記号セット</legend>
+            <label className="check-line">
+              <input
+                type="radio"
+                name="symbol-mode"
+                value="default"
+                checked={settings.symbolMode === "default"}
+                disabled={!ready}
+                onChange={() => update({ symbolMode: "default" }, true)}
+              />
+              デフォルトの記号セットを使う
+            </label>
+            <code>{GROUPS.symbols.chars}</code>
+            <label className="check-line">
+              <input
+                type="radio"
+                name="symbol-mode"
+                value="custom"
+                checked={settings.symbolMode === "custom"}
+                disabled={!ready}
+                onChange={() => update({ symbolMode: "custom" }, true)}
+              />
+              使用する記号を指定する
+            </label>
+            <div className="field custom-symbols">
+              <label htmlFor="custom-symbols">記号選択時に使う文字</label>
+              <input
+                id="custom-symbols"
+                type="text"
+                value={settings.customSymbols}
+                disabled={!ready || settings.symbolMode !== "custom"}
+                autoComplete="off"
+                spellCheck={false}
+                onCompositionStart={() => {
+                  clearTimeout(generationTimer.current);
+                  version.current++;
+                  setComposing(true);
+                  setSettled(false);
+                  setMessages({});
+                }}
+                onCompositionEnd={() => setComposing(false)}
+                onChange={(e) => update({ customSymbols: e.target.value })}
+                aria-invalid={visibleError("symbols")}
+                aria-describedby={`custom-symbols-help${visibleError("symbols") ? " symbols-error" : ""}`}
+              />
+              <p className="hint" id="custom-symbols-help">
+                デフォルトの記号以外（空白など）は無視します。
+              </p>
+              {error("symbols")}
+            </div>
+          </fieldset>
         </details>
         <label className="check-line">
           <input

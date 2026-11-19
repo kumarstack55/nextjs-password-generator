@@ -36,8 +36,98 @@ test("all 32 ASCII symbols, no spaces or alphanumerics", () => {
   assert.equal(new Set(GROUPS.symbols.chars).size, 32);
   assert.doesNotMatch(GROUPS.symbols.chars, /[A-Za-z0-9\s]/);
 });
+test("custom symbols are limited to unique default symbols", () => {
+  // Arrange
+  const settings = {
+    ...DEFAULTS,
+    groups: ["symbols"],
+    passwordLength: "1",
+    symbolMode: "custom",
+    customSymbols: "!!!@@",
+  };
+  const original = crypto.getRandomValues;
+  const values = [0, 1, 0, 1, 0, 1, 0, 1, 0, 1];
+  let passwords;
+
+  // Act
+  try {
+    crypto.getRandomValues = (value) => {
+      value[0] = values.shift() ?? 0;
+      return value;
+    };
+    passwords = generate(settings);
+  } finally {
+    crypto.getRandomValues = original;
+  }
+
+  // Assert
+  assert.deepEqual(passwords, [
+    "!",
+    "@",
+    "!",
+    "@",
+    "!",
+    "@",
+    "!",
+    "@",
+    "!",
+    "@",
+  ]);
+});
+test("custom symbol mode rejects input with no default symbols", () => {
+  // Arrange
+  const settings = {
+    ...DEFAULTS,
+    groups: ["symbols"],
+    symbolMode: "custom",
+    customSymbols: "a1 ",
+  };
+  let errors;
+  let generationError;
+
+  // Act
+  errors = validate(settings);
+  try {
+    generate(settings);
+  } catch (error) {
+    generationError = error;
+  }
+
+  // Assert
+  assert.ok(errors.symbols);
+  assert.equal(generationError?.message, "Invalid settings");
+});
+test("custom symbol mode rejects symbols removed by exclusions", () => {
+  // Arrange
+  const settings = {
+    ...DEFAULTS,
+    groups: ["symbols"],
+    symbolMode: "custom",
+    customSymbols: "!@",
+    excluded: "!@",
+    required: false,
+  };
+  let errors;
+  let generationError;
+
+  // Act
+  errors = validate(settings);
+  try {
+    generate(settings);
+  } catch (error) {
+    generationError = error;
+  }
+
+  // Assert
+  assert.ok(errors.symbols);
+  assert.equal(generationError?.message, "Invalid settings");
+});
 test("excluded characters never appear, including duplicated exclusions", () => {
-  const s = { ...DEFAULTS, excluded: "0O1Il!0O1Il!", length: "128" };
+  const s = {
+    ...DEFAULTS,
+    excluded: "0O1Il!0O1Il!",
+    passwordLength: "128",
+  };
   for (const p of generate(s)) {
     assert.equal(p.length, 128);
     assert.ok(![...p].some((c) => s.excluded.includes(c)));
@@ -90,11 +180,11 @@ test("similar-character exclusions participate in candidate validation", () => {
 });
 test("impossible and malformed settings are rejected", () => {
   for (const patch of [
-    { length: "" },
-    { length: "1.5" },
-    { length: "129" },
+    { passwordLength: "" },
+    { passwordLength: "1.5" },
+    { passwordLength: "129" },
     { groups: [] },
-    { length: "2" },
+    { passwordLength: "2" },
     {
       excluded: Object.values(GROUPS)
         .map((g) => g.chars)
@@ -112,14 +202,14 @@ test("one-character and optional-class cases work", () => {
     generate({
       ...DEFAULTS,
       groups: ["digits"],
-      length: "1",
+      passwordLength: "1",
       excluded: "123456789",
     }),
     Array(10).fill("0"),
   );
   for (const p of generate({
     ...DEFAULTS,
-    length: "1",
+    passwordLength: "1",
     required: false,
     excluded: GROUPS.digits.chars,
   }))
@@ -137,7 +227,7 @@ test("required classes are included even with severe exclusions", () => {
     ...DEFAULTS,
     groups: Object.keys(GROUPS),
     excluded,
-    length: "4",
+    passwordLength: "4",
   }))
     assert.equal([...p].sort().join(""), "!0Aa");
 });
@@ -157,7 +247,7 @@ test("persisted settings are whitelisted and malformed data rejected", () => {
     {},
     { ...DEFAULTS, groups: ["toString"] },
     { ...DEFAULTS, groups: ["upper", "upper"] },
-    { ...DEFAULTS, length: 64 },
+    { ...DEFAULTS, passwordLength: 64 },
     { ...DEFAULTS, excludeSimilar: "true" },
   ])
     assert.equal(readSettings(value), null);
@@ -166,6 +256,24 @@ test("saved settings without the similar-character option remain compatible", ()
   const legacy = { ...DEFAULTS };
   delete legacy.excludeSimilar;
   assert.deepEqual(readSettings(legacy), DEFAULTS);
+});
+test("saved settings without custom symbol settings use the default set", () => {
+  // Arrange
+  const legacy = { ...DEFAULTS };
+  delete legacy.symbolMode;
+  delete legacy.customSymbols;
+  const invalidMode = { ...DEFAULTS, symbolMode: "other" };
+  const invalidSymbols = { ...DEFAULTS, customSymbols: [] };
+
+  // Act
+  const restored = readSettings(legacy);
+  const rejectedMode = readSettings(invalidMode);
+  const rejectedSymbols = readSettings(invalidSymbols);
+
+  // Assert
+  assert.deepEqual(restored, DEFAULTS);
+  assert.equal(rejectedMode, null);
+  assert.equal(rejectedSymbols, null);
 });
 test("secure randomness failure never falls back to another source", () => {
   const original = crypto.getRandomValues;

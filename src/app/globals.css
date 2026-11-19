@@ -143,7 +143,8 @@ fieldset {
   font-size: 11px;
   margin-top: 3px;
 }
-input[type="checkbox"] {
+input[type="checkbox"],
+input[type="radio"] {
   accent-color: var(--accent);
   width: 17px;
   height: 17px;
@@ -166,6 +167,18 @@ details code {
   color: var(--ink);
   letter-spacing: 0.1em;
   line-height: 2;
+}
+.symbol-settings {
+  margin-top: 12px;
+}
+.symbol-settings legend {
+  color: var(--ink);
+}
+.symbol-settings .check-line {
+  color: var(--ink);
+}
+.symbol-settings code {
+  margin-left: 27px;
 }
 .check-line {
   display: flex;
@@ -205,7 +218,8 @@ details code {
   margin-left: 6px;
   font-weight: 400;
 }
-.excluded > input {
+.excluded > input,
+.custom-symbols > input {
   width: 100%;
   border: 1px solid #cdd9d0;
   border-radius: 8px;
@@ -213,6 +227,9 @@ details code {
   font-family: monospace;
   font-size: 16px;
   color: var(--ink);
+}
+.custom-symbols {
+  margin: 12px 0 0 27px;
 }
 .hint {
   font-size: 11px;
