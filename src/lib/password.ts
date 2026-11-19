@@ -106,13 +106,26 @@ function randomBelow(limit: number): number {
 
 function allocateCounts(
   length: number,
-  groupCount: number,
+  groupSizes: number[],
   required: boolean,
 ): number[] {
+  const groupCount = groupSizes.length;
   const counts = Array<number>(groupCount).fill(required ? 1 : 0);
   const reserved = required ? groupCount : 0;
+  const totalChars = groupSizes.reduce((a, b) => a + b, 0);
+
   for (let i = reserved; i < length; i++) {
-    counts[randomBelow(groupCount)]++;
+    // Select a group weighted by character count
+    let randomValue = randomBelow(totalChars);
+    let selectedGroup = 0;
+    for (let j = 0; j < groupCount; j++) {
+      if (randomValue < groupSizes[j]) {
+        selectedGroup = j;
+        break;
+      }
+      randomValue -= groupSizes[j];
+    }
+    counts[selectedGroup]++;
   }
   return counts;
 }
@@ -135,9 +148,10 @@ export function generate(s: Settings): string[] {
 
   return Array.from({ length: 10 }, () => {
     // 1. Decide how many characters to take from each character class.
+    const groupSizes = groups.map((chars) => chars.length);
     const counts = allocateCounts(
       Number(s.passwordLength),
-      groups.length,
+      groupSizes,
       s.required,
     );
 
